@@ -1,0 +1,9 @@
+%dw 2.0
+output application/json
+var customer = payload
+---
+{
+    id: customer.id,
+    name: customer.name,
+    email: customer.email
+}
