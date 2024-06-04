@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:json="http://www.mulesoft.org/schema/mule/json"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+      http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+      http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+      http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+      http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+      http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+    <!-- HTTP Listener Configuration -->
+    <http:listener-config name="HTTP_Listener_config" host="0.0.0.0" port="8081" doc:name="HTTP Listener config"/>
+
+    <!-- Salesforce Configuration -->
+    <salesforce:config-with-oauth name="Salesforce_Config" consumer-key="your_consumer_key" consumer-secret="your_consumer_secret" username="your_username" password="your_password" security-token="your_security_token" doc:name="Salesforce Config"/>
+
+    <!-- Database Configuration -->
+    <db:generic-config name="Database_Config" url="jdbc:mysql://localhost:3306/yourdatabase" user="youruser" password="yourpassword" driverClassName="com.mysql.cj.jdbc.Driver" doc:name="Database Config"/>
+
+    <!-- Get Customer Flow -->
+    <flow name="getCustomerFlow">
+        <http:listener config-ref="HTTP_Listener_config" path="/api/customer" method="GET" doc:name="HTTP Listener"/>
+        <db:select config-ref="Database_Config" doc:name="Database Select">
+            <db:sql>SELECT * FROM customers WHERE id = :id</db:sql>
+            <db:input-parameters>
+                <db:input-parameter key="id" value="#[attributes.queryParams.id]"/>
+            </db:input-parameters>
+        </db:select>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <set-payload value="#[payload]" doc:name="Set Payload"/>
+    </flow>
+
+    <!-- Create Customer Flow -->
+    <flow name="createCustomerFlow">
+        <http:listener config-ref="HTTP_Listener_config" path="/api/customer" method="POST" doc:name="HTTP Listener"/>
+        <json:json-to-object-transformer returnClass="java.util.Map" doc:name="JSON to Object"/>
+        <db:insert config-ref="Database_Config" doc:name="Database Insert">
+            <db:sql>INSERT INTO customers (id, name, email) VALUES (:id, :name, :email)</db:sql>
+            <db:input-parameters>
+                <db:input-parameter key="id" value="#[payload.id]"/>
+                <db:input-parameter key="name" value="#[payload.name]"/>
+                <db:input-parameter key="email" value="#[payload.email]"/>
+            </db:input-parameters>
+        </db:insert>
+        <salesforce:create config-ref="Salesforce_Config" type="Contact" doc:name="Create Salesforce Contact">
+            <salesforce:objects>
+                <salesforce:object type="Contact">
+                    <salesforce:field name="LastName" value="#[payload.name]"/>
+                    <salesforce:field name="Email" value="#[payload.email]"/>
+                </salesforce:object>
+            </salesforce:objects>
+        </salesforce:create>
+        <set-payload value="{'status': 'Customer created successfully'}" doc:name="Set Payload"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+    </flow>
+
+    <!-- Error Handling -->
+    <error-handler>
+        <on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate">
+            <logger message="Error occurred: #[error.description]" level="ERROR" doc:name="Log Error"/>
+            <set-payload value="#[{'status': 'error', 'message': error.description}]" doc:name="Set Payload"/>
+            <json:object-to-json-transformer doc:name="Object to JSON"/>
+        </on-error-propagate>
+    </error-handler>
+
+    <!-- Batch Job -->
+    <batch:job name="customerBatchJob" jobName="Customer Batch Job" doc:name="Customer Batch Job">
+        <batch:input>
+            <file:inbound-endpoint path="/path/to/input/directory" moveToDirectory="/path/to/archive/directory" doc:name="File Input"/>
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="processRecords" doc:name="Process Records">
+                <batch:commit>
+                    <db:insert config-ref="Database_Config" doc:name="Database Insert">
+                        <db:sql>INSERT INTO customers (id, name, email) VALUES (:id, :name, :email)</db:sql>
+                        <db:input-parameters>
+                            <db:input-parameter key="id" value="#[payload.id]"/>
+                            <db:input-parameter key="name" value="#[payload.name]"/>
+                            <db:input-parameter key="email" value="#[payload.email]"/>
+                        </db:input-parameters>
+                    </db:insert>
+                </batch:commit>
+            </batch:step>
+        </batch:process-records>
+    </batch:job>
+</mule>
