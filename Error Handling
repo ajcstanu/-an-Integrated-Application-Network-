@@ -1,0 +1,7 @@
+<error-handler>
+    <on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate">
+        <logger message="Error occurred: #[error.description]" level="ERROR" doc:name="Log Error"/>
+        <set-payload value="#[{'status': 'error', 'message': error.description}]" doc:name="Set Payload"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+    </on-error-propagate>
+</error-handler>
