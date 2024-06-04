@@ -1,0 +1,41 @@
+#%RAML 1.0
+title: Salesforce Integration API
+version: v1
+baseUri: http://localhost:8081/api
+mediaType: application/json
+
+/customer:
+  get:
+    description: Get customer data
+    queryParameters:
+      id:
+        description: The ID of the customer
+        type: string
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              {
+                "id": "tanishagupta02226",
+                "name": "Tanisha Gupta",
+                "email": "tanishagupta02226@gmail.com"
+              }
+
+  post:
+    description: Create a new customer
+    body:
+      application/json:
+        example: |
+          {
+            "name": "Tanisha Gupta",
+            "email": "tanishagupta02226@gmail.com"
+          }
+    responses:
+      201:
+        body:
+          application/json:
+            example: |
+              {
+                "status": "Customer created successfully"
+              }
